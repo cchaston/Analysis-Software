@@ -1,0 +1,172 @@
+mms_idl
+
+date='2017-07-24'
+timespan,date,1,/day
+mms_init,local_data_dir='/data/MMS/
+
+
+;get survey data
+
+mms_load_mec, probes=[1],data_rate=['srvy']
+
+mms_load_fgm, probes=[1],data_rate=['brst','srvy'];,trange=['2015-12-12/00:00:00', '2015-12-12/10:00:00']
+
+;mms_load_scm, probes=[1], data_rate='srvy', datatype='scsrvy'
+
+mms_load_edp, data_rate='fast', probes=[1], datatype='dce', level='l2'
+
+mms_load_dsp, data_rate='fast', probes=[1], datatype='epsd', level='l2'
+
+mms_load_dsp, data_rate='fast', probes=[1], datatype='bpsd', level='l2'
+
+mms_load_fpi, probes = [1], datatype = ['des-moms','dis-moms'], data_rate = 'fast'
+
+;get the hpca data
+
+mms_load_hpca, probes=['1'], datatype=['moments'],data_rate=['srvy']
+
+.run /path/fa_fields_combine.pro
+.run /path/combine2.pro
+.run /path/arctangent_fast.pro
+.run /path/fieldrot_fast.pro
+.run /path/interp_gap.pro
+.run /path/wavelet.pro
+.run /path/wavelet_data.pro
+.run /path/ave_power_spec_dynamic.pro
+.run /path/clu_pow_spec_fixed.pro
+.run /path/filter.pro
+.run /path/fluid_kinetic_mode_spec_diff_MHD_angle_new.pro
+.run /path/mhd_mode_decomp_te_minimization_angle_new.pro 
+
+;get data for use in mode decomp
+;*****************************************************************************
+
+;using mms1 survey data 
+
+get_data,'mms1_des_bulkv_gse_fast',data=mms1_des_bulkv_gse
+get_data,'mms1_dis_bulkv_gse_fast',data=mms1_dis_bulkv_gse
+get_data,'mms1_fgm_b_gse_srvy_l2',data=mms1_fgm_b_gse_srvy_l2
+get_data,'mms1_edp_dce_gse_fast_l2',data=mms1_edp_dce_gse_fast_l2
+get_data,'mms1_dis_tempperp_fast',data=mms1_dis_tempperp
+get_data,'mms1_dis_temppara_fast',data=mms1_dis_temppara
+get_data,'mms1_des_tempperp_fast',data=mms1_des_tempperp
+get_data,'mms1_des_temppara_fast',data=mms1_des_temppara 
+get_data,'mms1_des_numberdensity_fast',data=mms1_des_numberdensity 
+
+;*********************************************************************************
+
+keep_e=where(finite(mms1_des_tempperp.y) EQ 1 and mms1_des_tempperp.y GE 0.)
+
+mms1_des_tempperp={x:mms1_des_tempperp.x(keep_e),y:mms1_des_tempperp.y(keep_e)}
+mms1_des_temppara={x:mms1_des_temppara.x(keep_e),y:mms1_des_temppara.y(keep_e)}
+
+
+;survey time ranges
+
+time_range=['2017-07-24/00:00:0','2017-07-24/19:00:0']
+
+;get e, b, v and T on same time scale -use ion v quantities
+
+keep=where(mms1_dis_bulkv_gse.x GE gettime(time_range(0)) and mms1_dis_bulkv_gse.x LE gettime(time_range(1)))
+
+out_x=combine2( {x:mms1_dis_bulkv_gse.x(keep),y:mms1_dis_bulkv_gse.y(keep,0)} , {x:mms1_fgm_b_gse_srvy_l2.x,y:mms1_fgm_b_gse_srvy_l2.y(*,0)})
+out_y=combine2( {x:mms1_dis_bulkv_gse.x(keep),y:mms1_dis_bulkv_gse.y(keep,1)} , {x:mms1_fgm_b_gse_srvy_l2.x,y:mms1_fgm_b_gse_srvy_l2.y(*,1)})
+out_z=combine2( {x:mms1_dis_bulkv_gse.x(keep),y:mms1_dis_bulkv_gse.y(keep,2)} , {x:mms1_fgm_b_gse_srvy_l2.x,y:mms1_fgm_b_gse_srvy_l2.y(*,2)})
+
+vx_gse={x:out_x.time,y:out_x.comp1}
+vy_gse={x:out_y.time,y:out_y.comp1}
+vz_gse={x:out_z.time,y:out_z.comp1}
+
+bx_gse={x:out_x.time,y:out_x.comp2}
+by_gse={x:out_y.time,y:out_y.comp2}
+bz_gse={x:out_z.time,y:out_z.comp2}
+
+out_x=combine2( {x:mms1_dis_bulkv_gse.x(keep),y:mms1_dis_bulkv_gse.y(keep,0)} , {x:mms1_edp_dce_gse_fast_l2.x,y:mms1_edp_dce_gse_fast_l2.y(*,0)})
+out_y=combine2( {x:mms1_dis_bulkv_gse.x(keep),y:mms1_dis_bulkv_gse.y(keep,1)} , {x:mms1_edp_dce_gse_fast_l2.x,y:mms1_edp_dce_gse_fast_l2.y(*,1)})
+out_z=combine2( {x:mms1_dis_bulkv_gse.x(keep),y:mms1_dis_bulkv_gse.y(keep,2)} , {x:mms1_edp_dce_gse_fast_l2.x,y:mms1_edp_dce_gse_fast_l2.y(*,2)})
+
+ex_gse={x:out_x.time,y:out_x.comp2}
+ey_gse={x:out_y.time,y:out_y.comp2}
+ez_gse={x:out_z.time,y:out_z.comp2}
+
+out_e_tperp=combine2( vx_gse ,{x:mms1_des_tempperp.x,y:mms1_des_tempperp.y(*)})
+out_e_tpara=combine2( vx_gse ,{x:mms1_des_tempperp.x,y:mms1_des_temppara.y(*)})
+
+Ti={x:vx_gse.x,y:(2.0*mms1_dis_tempperp.y(keep)+mms1_dis_temppara.y(keep))/3.}
+Te={x:vx_gse.x,y:(2.0*out_e_tperp.comp2+out_e_tpara.comp2)/3.}
+
+dens_e={x:vx_gse.x, y:mms1_des_numberdensity.y(keep) }
+
+.run /home/ccc/Themis/HGI_2024/despike.pro
+
+
+despike,vx_gse,vy_gse,vz_gse,dens_e,Ti,dv_max=20.0,dn_max=5.0,dT_max=10.0
+despike,vx_gse,vy_gse,vz_gse,dens_e,Te,dv_max=40.0,dn_max=5.0,dT_max=10.0
+
+;*******************************************************************
+;get Alfven speed profile
+b_tot=sqrt(bx_gse.y^2+by_gse.y^2+bz_gse.y^2)
+va={x:vx_gse.x,y:1.0e-9*b_tot/sqrt(4.*!DPI*1.0e-7*dens_e.y*1.0e6*1.67e-27)}
+store_data,'va',data=va
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;MHD mode decomp
+mhd_mode_decomp_te_minimization_angle,'alfven_forward',bx_gse,by_gse,bz_gse,vx_gse,vy_gse,vz_gse,dens_e,Te,Ti,wa,freq,/theta_minvar
+mhd_mode_decomp_te_minimization_angle,'alfven_backward',bx_gse,by_gse,bz_gse,vx_gse,vy_gse,vz_gse,dens_e,Te,Ti,wa,freq,/theta_minvar
+mhd_mode_decomp_te_minimization_angle,'fast_forward',bx_gse,by_gse,bz_gse,vx_gse,vy_gse,vz_gse,dens_e,Te,Ti,wa,freq,/theta_minvar
+mhd_mode_decomp_te_minimization_angle,'fast_backward',bx_gse,by_gse,bz_gse,vx_gse,vy_gse,vz_gse,dens_e,Te,Ti,wa,freq,/theta_minvar
+mhd_mode_decomp_te_minimization_angle,'slow_forward',bx_gse,by_gse,bz_gse,vx_gse,vy_gse,vz_gse,dens_e,Te,Ti,wa,freq,/theta_minvar
+mhd_mode_decomp_te_minimization_angle,'slow_backward',bx_gse,by_gse,bz_gse,vx_gse,vy_gse,vz_gse,dens_e,Te,Ti,wa,freq,/theta_minvar
+
+options,'bx_spec','yrange',[0.001,0.1]
+options,'bx_spec','ystyle',1
+options,'alfven_forward_theta_wave','yrange',[0.001,0.1]
+options,'alfven_forward_comp','yrange',[0.001,0.1]
+options,'alfven_backward_comp','yrange',[0.001,0.1]
+options,'fast_forward_comp','yrange',[0.001,0.1]
+options,'fast_backward_comp','yrange',[0.001,0.1]
+options,'slow_forward_comp','yrange',[0.001,0.1]
+options,'slow_backward_comp','yrange',[0.001,0.1]
+
+
+options,'alfven_forward_comp','zrange',[0.0,0.5]
+options,'alfven_backward_comp','zrange',[0.0,0.5]
+options,'fast_forward_comp','zrange',[0.0,0.5]
+options,'fast_backward_comp','zrange',[0.0,0.5]
+options,'slow_forward_comp','zrange',[0.0,0.5]
+options,'slow_backward_comp','zrange',[0.0,0.5]
+
+
+options,'alfven_forward_by_spec','yrange',[0.001,0.1]
+options,'alfven_backward_by_spec','yrange',[0.001,0.1]
+options,'fast_forward_bz_spec','yrange',[0.001,0.1]
+options,'fast_backward_bz_spec','yrange',[0.001,0.1]
+options,'slow_forward_bz_spec','yrange',[0.001,0.1]
+options,'slow_backward_bz_spec','yrange',[0.001,0.1]
+
+
+tplot,['bx_spec','alfven_forward_theta_wave','alfven_forward_comp','alfven_backward_comp','fast_forward_comp','fast_backward_comp','slow_forward_comp','slow_backward_comp']   
+tplot,['alfven_forward_vy_spec','alfven_forward_by_spec','alfven_backward_vy_spec','alfven_backward_by_spec']                       
+tplot,['fast_forward_vx_spec','fast_forward_vz_spec','fast_forward_bz_spec','fast_forward_n_spec']
+tplot,['fast_backward_vx_spec','fast_backward_vz_spec','fast_backward_bz_spec','fast_backward_n_spec'] 
+tplot,['slow_forward_vx_spec','slow_forward_vz_spec','slow_forward_bz_spec','slow_forward_n_spec']
+tplot,['slow_backward_vx_spec','slow_backward_vz_spec','slow_backward_bz_spec','slow_backward_n_spec']                          
+   
+   
+get_data,'mms1_mec_r_gse',data=mec_gse
+store_data,'mms1_mec_r_gse_re',data={x:mec_gse.x,y:mec_gse.y/6370.}
+
+!p.charsize=0.5
+popen,'/home/ccc/MMS/HGI_2024/MMS_direct_comp_ele_dens'
+tplot,['mms1_des_energyspectr_omni_fast','bx_spec','alfven_forward_theta_wave','alfven_forward_comp','alfven_backward_comp',$
+'fast_forward_comp','fast_backward_comp','slow_forward_comp','slow_backward_comp'],var_label=['mms1_mec_r_gse_re'] 
+pclose  
+  
+!p.charsize=0.5
+popen,'/home/ccc/Themis/HGI_2024/MMS_direct_comp_spec_ele_dens'
+tplot,['alfven_forward_by_spec','alfven_backward_by_spec','fast_forward_bz_spec','fast_backward_bz_spec','slow_forward_bz_spec','slow_backward_bz_spec']
+pclose
+  
+   
+   
+        
